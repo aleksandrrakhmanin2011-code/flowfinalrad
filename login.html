@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FlowRad — Вход</title>
+<style>
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:#000;color:#cddcf2;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
+.card{width:320px;max-width:calc(100vw - 32px);padding:26px 24px;background:#000;border:1px solid #242424;border-radius:14px}
+.brand{font-family:monospace;font-size:11px;letter-spacing:.09em;color:#7f96b8;margin-bottom:22px}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#ffa845;margin-right:7px}
+h1{font-size:16px;margin:0 0 6px;color:#cddcf2}
+.sub{font-size:12px;color:#7f96b8;margin:0 0 20px}
+input{width:100%;padding:11px 12px;background:#050505;border:1px solid #242424;border-radius:9px;color:#cddcf2;outline:none;margin-bottom:14px}
+button{width:100%;padding:11px;background:#ffa845;color:#1a1103;border:0;border-radius:9px;font-weight:600;cursor:pointer}
+.error{font-size:11.5px;color:#ff6a6a;margin-bottom:12px;display:none}
+.error.show{display:block}
+</style>
+</head>
+<body>
+<form class="card" id="form">
+<div class="brand"><span class="dot"></span>FLOWRAD PRIVATE</div>
+<h1>Доступ ограничен</h1>
+<p class="sub">Введите пароль для входа в радар</p>
+<div id="err" class="error"></div>
+<input id="password" type="password" placeholder="Пароль" autocomplete="current-password" required autofocus>
+<button>Войти</button>
+</form>
+<script>
+const form=document.getElementById('form');
+const err=document.getElementById('err');
+form.addEventListener('submit',async e=>{
+ e.preventDefault(); err.classList.remove('show'); err.textContent='';
+ const password=document.getElementById('password').value;
+ try{
+  const r=await fetch('/api/auth',{
+   method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({password})
+  });
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){err.textContent=d.error||'Неверный или недействительный пароль';err.classList.add('show');return;}
+  const p=new URLSearchParams(location.search).get('next');
+  location.replace(p&&p.startsWith('/')&&!p.startsWith('//')?p:'/');
+ }catch(_){err.textContent='Ошибка соединения';err.classList.add('show')}
+});
+</script>
+</body>
+</html>
