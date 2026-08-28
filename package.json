@@ -1,0 +1,7 @@
+{
+  "name": "flowrad-private",
+  "private": true,
+  "dependencies": {
+    "@vercel/postgres": "latest"
+  }
+}
