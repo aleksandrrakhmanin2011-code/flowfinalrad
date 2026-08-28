@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FlowRad — Admin</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#050505;color:#d7e2f0;font-family:Arial,sans-serif}
+.wrap{max-width:1100px;margin:auto;padding:28px 18px}.card{background:#090909;border:1px solid #242424;border-radius:12px;padding:18px;margin-bottom:18px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}h1{font-size:20px;margin:0}.muted{color:#7f96b8;font-size:12px}
+input,select,button{border:1px solid #292929;border-radius:8px;padding:10px;background:#050505;color:#d7e2f0}button{cursor:pointer;background:#ffa845;color:#171006;font-weight:700}
+button.danger{background:#2b0d0d;color:#ff8c8c;border-color:#5a2020}.grid{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px}
+table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #202020}th{color:#7f96b8}
+.badge{padding:4px 7px;border-radius:6px;background:#102414;color:#79d18a}.rev{background:#2b1010;color:#ff8585}
+.keybox{display:none;background:#111;border:1px solid #3a3a3a;padding:14px;border-radius:9px;margin-top:14px}.key{font-family:monospace;font-size:18px;word-break:break-all;color:#ffa845}
+.error{color:#ff7777;margin-top:10px;font-size:12px}.login{max-width:420px;margin:100px auto}.hidden{display:none!important}
+.row{display:flex;gap:8px;align-items:center}.copy{background:#182030;color:#d7e2f0}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;gap:12px;flex-direction:column}table{display:block;overflow:auto}.row{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<div id="login" class="login card">
+<h1>FLOWRAD ADMIN</h1><p class="muted">Админка FlowRad. Ключ администратора не сохраняется. API: flowfinalrad.vercel.app</p>
+<input id="adminKey" type="password" placeholder="ADMIN_KEY" autocomplete="off" style="width:100%;margin:14px 0">
+<button id="loginBtn" style="width:100%">Войти</button><div id="loginError" class="error"></div>
+</div>
+<div id="app" class="wrap hidden">
+<div class="top"><div><h1>FLOWRAD ADMIN</h1><div class="muted">Создание и отзыв пользовательских паролей</div></div><button id="logout" class="danger">Выйти</button></div>
+<div class="card">
+<h3 style="margin-top:0">Создать пароль</h3>
+<div class="grid">
+<input id="label" placeholder="Имя / описание пользователя">
+<select id="days"><option value="0">Без срока</option><option value="1">1 день</option><option value="7">7 дней</option><option value="30" selected>30 дней</option><option value="90">90 дней</option><option value="365">365 дней</option></select>
+<select id="sessions"><option value="1" selected>1 устройство</option><option value="2">2 устройства</option><option value="5">5 устройств</option><option value="20">20 устройств</option></select>
+<button id="create">Создать</button>
+</div>
+<div id="newKey" class="keybox"><div class="muted">Сохраните ключ. Полный ключ больше не показывается.</div><div class="row"><div id="keyValue" class="key"></div><button id="copy" class="copy">Копировать</button></div></div>
+<div id="createError" class="error"></div>
+</div>
+<div class="card">
+<div class="top" style="margin-bottom:10px"><h3 style="margin:0">Ключи</h3><button id="refresh">Обновить</button></div>
+<table><thead><tr><th>Имя</th><th>Создан</th><th>Истекает</th><th>IP</th><th>Использований</th><th>Статус</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+</div></div>
+<script>
+const API='https://flowfinalrad.vercel.app/api/admin';
+let KEY='';
+const $=id=>document.getElementById(id);
+function fmt(v){return v?new Date(v).toLocaleString('ru-RU'):'—'}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function opts(extra={}){return {...extra,headers:{...(extra.headers||{}),'X-Admin-Key':KEY}}}
+async function load(){
+ const r=await fetch(API,opts());
+ if(r.status===401){logout();throw new Error('Неверный ADMIN_KEY')}
+ const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'Ошибка');
+ $('rows').innerHTML=d.keys.map(k=>`<tr><td>${esc(k.label)}</td><td>${fmt(k.created_at)}</td><td>${fmt(k.expires_at)}</td><td>${esc(k.last_ip||'—')}</td><td>${k.use_count||0}</td><td><span class="badge ${k.revoked?'rev':''}">${k.revoked?'ОТОЗВАН':'АКТИВЕН'}</span></td><td>${k.revoked?'':`<button class="danger" onclick="revokeKey('${encodeURIComponent(k.id)}')">Отозвать</button>`}</td></tr>`).join('');
+}
+async function revokeKey(encoded){
+ const id=decodeURIComponent(encoded);if(!confirm('Отозвать этот ключ?'))return;
+ const r=await fetch(API+'?id='+encodeURIComponent(id),opts({method:'DELETE'}));
+ if(!r.ok){alert('Не удалось отозвать');return}await load();
+}
+async function login(){
+ const k=$('adminKey').value.trim();if(!k)return;$('loginError').textContent='';
+ try{const r=await fetch(API,{headers:{'X-Admin-Key':k}});if(!r.ok){$('loginError').textContent='Неверный ADMIN_KEY';return}
+ KEY=k;$('login').classList.add('hidden');$('app').classList.remove('hidden');await load();
+ }catch(e){$('loginError').textContent=e.message||'Ошибка соединения'}
+}
+function logout(){KEY='';$('app').classList.add('hidden');$('login').classList.remove('hidden');$('adminKey').value=''}
+$('loginBtn').onclick=login;$('logout').onclick=logout;$('refresh').onclick=()=>load().catch(e=>alert(e.message));
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('keyValue').textContent);$('copy').textContent='Скопировано';setTimeout(()=>$('copy').textContent='Копировать',1200)}catch{}};
+$('create').onclick=async()=>{
+ $('createError').textContent='';$('newKey').style.display='none';
+ try{const r=await fetch(API,opts({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({label:$('label').value.trim()||'Flowrad user',days:Number($('days').value),maxSessions:Number($('sessions').value)})}));
+ const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'Ошибка');$('keyValue').textContent=d.key;$('newKey').style.display='block';$('label').value='';await load();
+ }catch(e){$('createError').textContent=e.message||'Ошибка'}
+};
+$('adminKey').addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+</script>
+</body>
+</html>
